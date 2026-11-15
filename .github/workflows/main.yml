@@ -1,0 +1,35 @@
+name: Build Windows Executable
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch: # Позволяет запускать сборку вручную
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        update: true
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-opencv
+          mingw-w64-x86_64-make
+
+    - name: Compile with MinGW
+      shell: msys2 {0}
+      run: |
+        g++ sender.cpp -o sender.exe -std=c++17 -lopencv_core510 -lopencv_imgproc510 -lopencv_highgui510 -lopencv_videoio510 -lopencv_imgcodecs510 -lws2_32 -static-libgcc -static-libstdc++
+
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: sender-exe
+        path: sender.exe
