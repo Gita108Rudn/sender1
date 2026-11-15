@@ -16,18 +16,21 @@ jobs:
     - name: Setup MSVC (Visual Studio Compiler)
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download OpenCV Windows (with static libs)
+    - name: Download and Extract OpenCV
+      shell: pwsh
       run: |
-        # Скачиваем официальный архив OpenCV (около 250 МБ)
+        # 1. Скачиваем официальный установщик OpenCV (это самораспаковывающийся архив)
         curl -L -o opencv-installer.exe https://github.com/opencv/opencv/releases/download/4.10.0/opencv-4.10.0-windows.exe
-        # Распаковываем его без установки
-        ./opencv-installer.exe -o"C:\opencv" -y
+        # 2. Распаковываем его с помощью 7z (он предустановлен на раннерах Windows)
+        # Ключ x - извлечь с сохранением путей, -o. - в текущую папку
+        7z x opencv-installer.exe -o. -y
+        # 3. Проверяем, что папка include появилась по ожидаемому пути
+        dir ./opencv/build/include
 
     - name: Compile Static EXE
       run: |
-        # Компилируем с флагом /MT (статический рантайм)
-        # Указываем пути к статическим библиотекам OpenCV (vc16/staticlib)
-        cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT /I "C:\opencv\build\include" /Fe:sender.exe /link /LIBPATH:"C:\opencv\build\x64\vc16\staticlib" opencv_world4100.lib ws2_32.lib
+        # Теперь используем путь ./opencv/build/include
+        cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT /I "./opencv/build/include" /Fe:sender.exe /link /LIBPATH:"./opencv/build/x64/vc16/staticlib" opencv_world4100.lib ws2_32.lib
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
