@@ -3,7 +3,7 @@ name: Build Windows Executable
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch: # Позволяет запускать сборку вручную
+  workflow_dispatch:
 
 jobs:
   build:
@@ -17,7 +17,6 @@ jobs:
       uses: msys2/setup-msys2@v2
       with:
         msystem: MINGW64
-        update: true
         install: >-
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-opencv
@@ -26,18 +25,20 @@ jobs:
     - name: Compile with MinGW
       shell: msys2 {0}
       run: |
-        # Используем pkg-config. Если он не найдет opencv5, попробует opencv4.
         OPENCV_FLAGS=$(pkg-config --cflags --libs opencv5 || pkg-config --cflags --libs opencv4)
         g++ sender.cpp -o sender.exe -std=c++17 $OPENCV_FLAGS -lws2_32 -static-libgcc -static-libstdc++
 
     - name: Copy required DLLs
       shell: msys2 {0}
       run: |
-        # Копируем DLL файлы OpenCV и системные зависимости из папки MSYS2
+        # 1. Копируем все OpenCV DLL
         cp /mingw64/bin/libopencv*.dll . || true
         cp /mingw64/bin/libwinpthread-1.dll . || true
         cp /mingw64/bin/libgcc_s_seh-1.dll . || true
         cp /mingw64/bin/libstdc++-6.dll . || true
+        
+        # 2. МАГИЯ: Автоматически находим и копируем ВСЕ зависимости (включая libjpeg, libavif и т.д.)
+        ldd sender.exe | grep "mingw64/bin" | awk '{print $3}' | xargs -I{} cp {} . || true
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
