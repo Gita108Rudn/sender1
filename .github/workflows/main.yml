@@ -1,4 +1,4 @@
-name: Build Windows Executable
+name: Build Windows Executable with All DLLs
 
 on:
   push:
@@ -21,6 +21,7 @@ jobs:
           mingw-w64-x86_64-gcc
           mingw-w64-x86_64-opencv
           mingw-w64-x86_64-pkgconf
+          mingw-w64-x86_64-qt6-base
 
     - name: Compile with MinGW
       shell: msys2 {0}
@@ -28,11 +29,29 @@ jobs:
         OPENCV_FLAGS=$(pkg-config --cflags --libs opencv5 || pkg-config --cflags --libs opencv4)
         g++ sender.cpp -o sender.exe -std=c++17 $OPENCV_FLAGS -lws2_32 -static-libgcc -static-libstdc++
 
-    - name: Copy ALL DLLs
+    - name: Deploy Qt and Dependencies
       shell: msys2 {0}
       run: |
-        # ВОТ ОНА, МАГИЯ: копируем абсолютно все DLL из системной папки MSYS2
-        cp /mingw64/bin/*.dll .
+        # 1. Копируем все библиотеки OpenCV
+        cp /mingw64/bin/libopencv*.dll . || true
+        
+        # 2. Копируем библиотеки кодеков, которых вам не хватало
+        cp /mingw64/bin/libjpeg*.dll . || true
+        cp /mingw64/bin/libavif*.dll . || true
+        cp /mingw64/bin/libjxl*.dll . || true
+        cp /mingw64/bin/libpng*.dll . || true
+        cp /mingw64/bin/libwebp*.dll . || true
+        cp /mingw64/bin/libtiff*.dll . || true
+        cp /mingw64/bin/libopenblas*.dll . || true
+        
+        # 3. Копируем стандартные рантаймы C++
+        cp /mingw64/bin/libgcc_s_seh-1.dll . || true
+        cp /mingw64/bin/libwinpthread-1.dll . || true
+        cp /mingw64/bin/libstdc++-6.dll . || true
+
+        # 4. МАГИЯ ДЛЯ QT: Утилита windeployqt сама найдет и скопирует все Qt DLL 
+        # и создаст папку platforms с нужными плагинами
+        windeployqt6 sender.exe || windeployqt sender.exe || true
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
@@ -41,3 +60,8 @@ jobs:
         path: |
           sender.exe
           *.dll
+          platforms/
+          styles/
+          imageformats/
+          iconengines/
+          tls/
