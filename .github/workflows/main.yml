@@ -1,4 +1,4 @@
-name: Build Standalone Windows Executable
+name: Build Windows Executable with All DLLs
 
 on:
   push:
@@ -13,28 +13,46 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup MSVC (Visual Studio Compiler)
-      uses: ilammy/msvc-dev-cmd@v1
+    - name: Setup MSYS2
+      uses: msys2/setup-msys2@v2
+      with:
+        msystem: MINGW64
+        install: >-
+          mingw-w64-x86_64-gcc
+          mingw-w64-x86_64-opencv
+          mingw-w64-x86_64-pkgconf
+          mingw-w64-x86_64-ntldd
 
-    - name: Install OpenCV via vcpkg (Static)
+    - name: Compile with MinGW
+      shell: msys2 {0}
       run: |
-        # Устанавливаем статическую версию OpenCV с базовым набором функций.
-        # videoio и imgcodecs уже включены в default-features.
-        vcpkg install opencv[core,default-features]:x64-windows-static
+        OPENCV_FLAGS=$(pkg-config --cflags --libs opencv5 || pkg-config --cflags --libs opencv4)
+        g++ sender.cpp -o sender.exe -std=c++17 $OPENCV_FLAGS -lws2_32 -static-libgcc -static-libstdc++
 
-    - name: Configure CMake
+    - name: Deploy all DLL dependencies automatically
+      shell: msys2 {0}
       run: |
-        # Настраиваем проект с указанием статического триплета vcpkg.
-        # CMake автоматически найдет OpenCV и применит нужные флаги (/MT).
-        cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
-
-    - name: Build with MSVC
-      run: |
-        # Собираем проект в конфигурации Release
-        cmake --build build --config Release
+        # Создаем папку для артефактов
+        mkdir -p artifact
+        
+        # Копируем exe
+        cp sender.exe artifact/
+        
+        # НАДЕЖНЫЙ СПОСОБ: Используем ntldd для рекурсивного поиска всех зависимостей
+        # -R означает рекурсивный поиск, -D показывает только DLL
+        ntldd -R sender.exe | grep "mingw64/bin" | awk '{print $3}' | while read dll; do
+          if [ -f "$dll" ]; then
+            cp "$dll" artifact/
+          fi
+        done
+        
+        # Добавим системные DLL, которые могут быть не найдены ntldd
+        cp /mingw64/bin/libwinpthread-1.dll artifact/ 2>/dev/null || true
+        cp /mingw64/bin/libgcc_s_seh-1.dll artifact/ 2>/dev/null || true
+        cp /mingw64/bin/libstdc++-6.dll artifact/ 2>/dev/null || true
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sender-standalone
-        path: build/Release/sender.exe
+        name: sender-with-dlls
+        path: artifact/
