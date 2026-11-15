@@ -16,23 +16,22 @@ jobs:
     - name: Setup MSVC (Visual Studio Compiler)
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download and Extract OpenCV
-      shell: pwsh
+    - name: Install OpenCV via vcpkg (Static)
       run: |
-        # Скачиваем установщик OpenCV
-        curl -L -o opencv-installer.exe https://github.com/opencv/opencv/releases/download/4.10.0/opencv-4.10.0-windows.exe
-        
-        # Запускаем установщик с правильными параметрами для PowerShell
-        # -o"./" означает "распаковать в текущую директорию"
-        # -y означает "подтвердить все запросы"
-        ./opencv-installer.exe -o"./" -y
-        
-        # Проверяем, что нужные файлы появились
-        dir ./opencv/build/include
+        # vcpkg уже предустановлен на раннере windows-latest
+        # Устанавливаем статическую версию OpenCV
+        vcpkg install opencv[core,imgproc,highgui,videoio,imgcodecs]:x64-windows-static
 
     - name: Compile Static EXE
       run: |
-        cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT /I "./opencv/build/include" /Fe:sender.exe /link /LIBPATH:"./opencv/build/x64/vc16/staticlib" opencv_world4100.lib ws2_32.lib
+        # Компилируем с флагом /MT (статический рантайм)
+        # Указываем пути к установленным через vcpkg заголовкам и библиотекам
+        cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT ^
+          /I "C:\vcpkg\installed\x64-windows-static\include" ^
+          /Fe:sender.exe ^
+          /link ^
+          /LIBPATH:"C:\vcpkg\installed\x64-windows-static\lib" ^
+          opencv_world4.lib ws2_32.lib
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
