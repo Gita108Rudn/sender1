@@ -18,16 +18,17 @@ jobs:
 
     - name: Install OpenCV via vcpkg (Static)
       run: |
-        # vcpkg уже предустановлен на раннере windows-latest
-        # Устанавливаем статическую версию OpenCV
-        vcpkg install opencv[core,imgproc,highgui,videoio,imgcodecs]:x64-windows-static
+        # Устанавливаем статическую версию OpenCV с базовым набором функций.
+        # Функции videoio и imgcodecs не указываются отдельно, так как они
+        # входят в стандартную сборку или подтягиваются как зависимости.
+        vcpkg install opencv[core,default-features]:x64-windows-static
 
     - name: Compile Static EXE
       run: |
-        # Компилируем с флагом /MT (статический рантайм)
-        # Указываем пути к установленным через vcpkg заголовкам и библиотекам
+        # Компилируем с флагом /MT (статический рантайм).
+        # Обратите внимание на путь к заголовкам: vcpkg добавляет подпапку opencv4.
         cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT ^
-          /I "C:\vcpkg\installed\x64-windows-static\include" ^
+          /I "C:\vcpkg\installed\x64-windows-static\include\opencv4" ^
           /Fe:sender.exe ^
           /link ^
           /LIBPATH:"C:\vcpkg\installed\x64-windows-static\lib" ^
