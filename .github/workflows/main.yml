@@ -1,4 +1,4 @@
-name: Build Windows Executable with All DLLs
+name: Build Standalone Windows Executable (MinGW Static)
 
 on:
   push:
@@ -13,46 +13,56 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Setup MSYS2
-      uses: msys2/setup-msys2@v2
+    - name: Setup MinGW-w64
+      uses: egor-tensin/setup-mingw@v2
       with:
-        msystem: MINGW64
-        install: >-
-          mingw-w64-x86_64-gcc
-          mingw-w64-x86_64-opencv
-          mingw-w64-x86_64-pkgconf
-          mingw-w64-x86_64-ntldd
+        version: 12.2.0 # Используем стабильную версию
 
-    - name: Compile with MinGW
-      shell: msys2 {0}
+    - name: Build OpenCV 5.0.0 from source
+      shell: cmd
       run: |
-        OPENCV_FLAGS=$(pkg-config --cflags --libs opencv5 || pkg-config --cflags --libs opencv4)
-        g++ sender.cpp -o sender.exe -std=c++17 $OPENCV_FLAGS -lws2_32 -static-libgcc -static-libstdc++
+        REM Скачиваем исходники OpenCV 5.0.0 и opencv_contrib
+        curl -L -o opencv.zip https://github.com/opencv/opencv/archive/refs/tags/5.0.0.zip
+        curl -L -o opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/refs/tags/5.0.0.zip
+        7z x opencv.zip
+        7z x opencv_contrib.zip
+        ren opencv-5.0.0 opencv
+        ren opencv_contrib-5.0.0 opencv_contrib
 
-    - name: Deploy all DLL dependencies automatically
-      shell: msys2 {0}
+        REM Создаем папку для сборки
+        mkdir build
+        cd build
+
+        REM Конфигурируем CMake для статической сборки с MinGW
+        cmake -G "MinGW Makefiles" ^
+          -DCMAKE_BUILD_TYPE=Release ^
+          -DBUILD_SHARED_LIBS=OFF ^
+          -DBUILD_opencv_world=ON ^
+          -DWITH_OPENCL=OFF ^
+          -DWITH_IPP=OFF ^
+          -DBUILD_TESTS=OFF ^
+          -DBUILD_PERF_TESTS=OFF ^
+          -DBUILD_EXAMPLES=OFF ^
+          -DOPENCV_EXTRA_MODULES_PATH=../opencv_contrib/modules ^
+          ../opencv
+
+        REM Собираем и устанавливаем OpenCV
+        mingw32-make -j4
+        mingw32-make install
+
+    - name: Compile sender.cpp with static OpenCV
+      shell: cmd
       run: |
-        # Создаем папку для артефактов
-        mkdir -p artifact
-        
-        # Копируем exe
-        cp sender.exe artifact/
-        
-        # НАДЕЖНЫЙ СПОСОБ: Используем ntldd для рекурсивного поиска всех зависимостей
-        # -R означает рекурсивный поиск, -D показывает только DLL
-        ntldd -R sender.exe | grep "mingw64/bin" | awk '{print $3}' | while read dll; do
-          if [ -f "$dll" ]; then
-            cp "$dll" artifact/
-          fi
-        done
-        
-        # Добавим системные DLL, которые могут быть не найдены ntldd
-        cp /mingw64/bin/libwinpthread-1.dll artifact/ 2>/dev/null || true
-        cp /mingw64/bin/libgcc_s_seh-1.dll artifact/ 2>/dev/null || true
-        cp /mingw64/bin/libstdc++-6.dll artifact/ 2>/dev/null || true
+        REM Компилируем наш sender.cpp, используя установленную статическую OpenCV
+        REM Обратите внимание на пути: они соответствуют стандартному install для MinGW
+        g++ sender.cpp -o sender.exe -std=c++17 ^
+          -I"C:/Program Files/opencv/build/install/include" ^
+          -L"C:/Program Files/opencv/build/install/x64/mingw/lib" ^
+          -lopencv_world500 ^
+          -lws2_32 -static-libgcc -static-libstdc++
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: sender-with-dlls
-        path: artifact/
+        name: sender-standalone
+        path: sender.exe
