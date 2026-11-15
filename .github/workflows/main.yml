@@ -28,17 +28,11 @@ jobs:
         OPENCV_FLAGS=$(pkg-config --cflags --libs opencv5 || pkg-config --cflags --libs opencv4)
         g++ sender.cpp -o sender.exe -std=c++17 $OPENCV_FLAGS -lws2_32 -static-libgcc -static-libstdc++
 
-    - name: Copy required DLLs
+    - name: Copy ALL DLLs
       shell: msys2 {0}
       run: |
-        # 1. Копируем все OpenCV DLL
-        cp /mingw64/bin/libopencv*.dll . || true
-        cp /mingw64/bin/libwinpthread-1.dll . || true
-        cp /mingw64/bin/libgcc_s_seh-1.dll . || true
-        cp /mingw64/bin/libstdc++-6.dll . || true
-        
-        # 2. МАГИЯ: Автоматически находим и копируем ВСЕ зависимости (включая libjpeg, libavif и т.д.)
-        ldd sender.exe | grep "mingw64/bin" | awk '{print $3}' | xargs -I{} cp {} . || true
+        # ВОТ ОНА, МАГИЯ: копируем абсолютно все DLL из системной папки MSYS2
+        cp /mingw64/bin/*.dll .
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
