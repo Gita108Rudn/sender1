@@ -32,7 +32,7 @@ int main() {
     serv_addr.sin_family = AF_INET;
     
     // ВАЖНО: Сюда вставьте порт, который выдаст bore на Linux! (например, 34521)
-    int BORE_PORT = 18837;
+    int BORE_PORT = 9569;
     serv_addr.sin_port = htons(BORE_PORT);
 
     // Разрешаем доменное имя bore.pub в IP-адрес
