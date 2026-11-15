@@ -19,17 +19,19 @@ jobs:
     - name: Download and Extract OpenCV
       shell: pwsh
       run: |
-        # 1. Скачиваем официальный установщик OpenCV (это самораспаковывающийся архив)
+        # Скачиваем установщик OpenCV
         curl -L -o opencv-installer.exe https://github.com/opencv/opencv/releases/download/4.10.0/opencv-4.10.0-windows.exe
-        # 2. Распаковываем его с помощью 7z (он предустановлен на раннерах Windows)
-        # Ключ x - извлечь с сохранением путей, -o. - в текущую папку
-        7z x opencv-installer.exe -o. -y
-        # 3. Проверяем, что папка include появилась по ожидаемому пути
+        
+        # Запускаем установщик с правильными параметрами для PowerShell
+        # -o"./" означает "распаковать в текущую директорию"
+        # -y означает "подтвердить все запросы"
+        ./opencv-installer.exe -o"./" -y
+        
+        # Проверяем, что нужные файлы появились
         dir ./opencv/build/include
 
     - name: Compile Static EXE
       run: |
-        # Теперь используем путь ./opencv/build/include
         cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT /I "./opencv/build/include" /Fe:sender.exe /link /LIBPATH:"./opencv/build/x64/vc16/staticlib" opencv_world4100.lib ws2_32.lib
 
     - name: Upload Artifact
