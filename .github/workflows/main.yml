@@ -19,23 +19,22 @@ jobs:
     - name: Install OpenCV via vcpkg (Static)
       run: |
         # Устанавливаем статическую версию OpenCV с базовым набором функций.
-        # Функции videoio и imgcodecs не указываются отдельно, так как они
-        # входят в стандартную сборку или подтягиваются как зависимости.
+        # videoio и imgcodecs уже включены в default-features.
         vcpkg install opencv[core,default-features]:x64-windows-static
 
-    - name: Compile Static EXE
+    - name: Configure CMake
       run: |
-        # Компилируем с флагом /MT (статический рантайм).
-        # Обратите внимание на путь к заголовкам: vcpkg добавляет подпапку opencv4.
-        cl.exe sender.cpp /std:c++17 /EHsc /O2 /MT ^
-          /I "C:\vcpkg\installed\x64-windows-static\include\opencv4" ^
-          /Fe:sender.exe ^
-          /link ^
-          /LIBPATH:"C:\vcpkg\installed\x64-windows-static\lib" ^
-          opencv_world4.lib ws2_32.lib
+        # Настраиваем проект с указанием статического триплета vcpkg.
+        # CMake автоматически найдет OpenCV и применит нужные флаги (/MT).
+        cmake -B build -S . -DCMAKE_TOOLCHAIN_FILE="C:/vcpkg/scripts/buildsystems/vcpkg.cmake" -DVCPKG_TARGET_TRIPLET=x64-windows-static
+
+    - name: Build with MSVC
+      run: |
+        # Собираем проект в конфигурации Release
+        cmake --build build --config Release
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v4
       with:
         name: sender-standalone
-        path: sender.exe
+        path: build/Release/sender.exe
